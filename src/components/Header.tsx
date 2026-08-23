@@ -47,6 +47,8 @@ interface HeaderProps {
   onOpenSettings?: () => void;
   currentTheme?: string;
   onSelectTheme?: (themeId: any) => void;
+  wakeWord?: string;
+  enableWakeWord?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -62,6 +64,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   currentTheme,
   onSelectTheme,
+  wakeWord = "Jarvis",
+  enableWakeWord = true,
 }) => {
   const {
     streamStatus,
@@ -258,6 +262,26 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Status Indicator, Theme Toggle, Settings & Sound Toggle */}
         <div className="hidden md:flex items-center gap-2.5">
+          {/* Wake-Word Indicator Button */}
+          <button
+            id="header-wake-word-btn"
+            onClick={() => {
+              jarvisSound.playBlip();
+              onOpenSettings?.();
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-mono transition-all cursor-pointer ${
+              enableWakeWord
+                ? "bg-cyan-950/70 border-cyan-500/40 text-cyan-300 hover:border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.2)]"
+                : "bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-400"
+            }`}
+            title={`Wake-Word: "${wakeWord}". Click to configure custom wake-word in Settings.`}
+          >
+            <Mic className={`w-3 h-3 ${enableWakeWord ? "text-cyan-400 animate-pulse" : "text-slate-500"}`} />
+            <span className="font-semibold text-[11px] hidden xl:inline">
+              WAKE: <span className="text-cyan-200 uppercase">"{wakeWord}"</span>
+            </span>
+          </button>
+
           {/* Global Persistent Live Audio Widget */}
           <button
             id="header-live-session-toggle-btn"

@@ -278,7 +278,15 @@ export interface FeatureFlags {
   enableSoundFX: boolean;
 }
 
+export interface VoiceSettings {
+  wakeWord: string;
+  enableWakeWord: boolean;
+  speechRecognitionLang?: string;
+  continuousWakeWord?: boolean;
+}
+
 export interface AppSettings {
   background: BackgroundSettings;
   features: FeatureFlags;
+  voice: VoiceSettings;
 }

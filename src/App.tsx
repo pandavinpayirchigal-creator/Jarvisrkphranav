@@ -173,6 +173,12 @@ const DEFAULT_SETTINGS: AppSettings = {
     enableVisionTools: true,
     enableSoundFX: true,
   },
+  voice: {
+    wakeWord: "Jarvis",
+    enableWakeWord: true,
+    speechRecognitionLang: "en-US",
+    continuousWakeWord: true,
+  },
 };
 
 const SETTINGS_STORAGE_KEY = "jarvis_system_settings_v1";
@@ -188,6 +194,7 @@ export default function App() {
           ...parsed,
           background: { ...DEFAULT_SETTINGS.background, ...(parsed.background || {}) },
           features: { ...DEFAULT_SETTINGS.features, ...(parsed.features || {}) },
+          voice: { ...DEFAULT_SETTINGS.voice, ...(parsed.voice || {}) },
         };
       }
     } catch (e) {
@@ -647,6 +654,31 @@ How may I assist you today?`,
     }
   };
 
+  // Start microphone listening state
+  const handleStartListening = () => {
+    if (isListening) return;
+    jarvisSound.playActivationChime();
+    speechService.startListening({
+      onStart: () => {
+        setIsListening(true);
+        addLog("INFO", "VOICE_RECOGNITION", "Microphone listening stream active.");
+      },
+      onResult: (transcript, isFinal) => {
+        if (isFinal) {
+          setIsListening(false);
+          handleSendMessage(transcript, pendingAttachments);
+        }
+      },
+      onError: (err) => {
+        setIsListening(false);
+        addLog("WARN", "VOICE_RECOGNITION", `Microphone error: ${err}`);
+      },
+      onEnd: () => {
+        setIsListening(false);
+      },
+    });
+  };
+
   // Voice STT Toggle
   const handleToggleListen = () => {
     if (isListening) {
@@ -654,28 +686,46 @@ How may I assist you today?`,
       setIsListening(false);
       jarvisSound.playBlip();
     } else {
-      jarvisSound.playActivationChime();
-      speechService.startListening({
-        onStart: () => {
-          setIsListening(true);
-          addLog("INFO", "VOICE_RECOGNITION", "Microphone listening stream active.");
-        },
-        onResult: (transcript, isFinal) => {
-          if (isFinal) {
-            setIsListening(false);
-            handleSendMessage(transcript, pendingAttachments);
-          }
-        },
-        onError: (err) => {
-          setIsListening(false);
-          addLog("WARN", "VOICE_RECOGNITION", `Microphone error: ${err}`);
-        },
-        onEnd: () => {
-          setIsListening(false);
-        },
-      });
+      handleStartListening();
     }
   };
+
+  // Synchronize and manage Wake-Word acoustic listener
+  useEffect(() => {
+    const wakeWord = settings.voice?.wakeWord || "Jarvis";
+    const isWakeWordEnabled = settings.voice?.enableWakeWord !== false;
+
+    speechService.setWakeWord(wakeWord);
+
+    if (isWakeWordEnabled && speechService.isSupported()) {
+      speechService.startWakeWordDetection(
+        {
+          onWakeWordDetected: (detectedPhrase, remainingTranscript) => {
+            addLog("INFO", "WAKE_WORD", `Wake-word "${detectedPhrase}" triggered! Activating microphone listening state.`);
+            jarvisSound.playActivationChime();
+
+            if (remainingTranscript && remainingTranscript.trim().length > 0) {
+              // Spoken command already provided after wake-word
+              handleSendMessage(remainingTranscript, pendingAttachments);
+            } else {
+              // Initiate active microphone listening state
+              handleStartListening();
+            }
+          },
+          onError: (err) => {
+            console.debug("Wake-word listener note:", err);
+          },
+        },
+        wakeWord
+      );
+    } else {
+      speechService.stopWakeWordDetection();
+    }
+
+    return () => {
+      speechService.stopWakeWordDetection();
+    };
+  }, [settings.voice?.wakeWord, settings.voice?.enableWakeWord, settings.voice?.speechRecognitionLang, pendingAttachments]);
 
   // Diagnostic API handler
   const handleTriggerDiagnostic = async (customIssue?: string): Promise<string> => {
@@ -801,6 +851,8 @@ How may I assist you today?`,
               background: { ...settings.background, themeId },
             })
           }
+          wakeWord={settings.voice?.wakeWord || "Jarvis"}
+          enableWakeWord={settings.voice?.enableWakeWord !== false}
         />
 
         {/* Tactical Stark HUD Chassis Wings (Telemetry & Orbital array) */}

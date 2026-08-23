@@ -25,8 +25,13 @@ import {
   Link,
   Wand2,
   Trash2,
+  Mic,
+  MicOff,
+  MessageSquare,
+  Play,
+  CheckCircle2,
 } from "lucide-react";
-import { AppSettings, BackgroundThemeId, FeatureFlags } from "../types";
+import { AppSettings, BackgroundThemeId, FeatureFlags, VoiceSettings } from "../types";
 import { jarvisSound } from "../services/soundEffects";
 
 interface SettingsModalProps {
@@ -36,6 +41,16 @@ interface SettingsModalProps {
   onUpdateSettings: (newSettings: AppSettings) => void;
   onResetDefaults: () => void;
 }
+
+const WAKE_WORD_PRESETS = [
+  { label: "Jarvis", value: "Jarvis", desc: "Default Stark Core designation" },
+  { label: "Hey Jarvis", value: "Hey Jarvis", desc: "Natural conversational prefix" },
+  { label: "Friday", value: "Friday", desc: "Mark 45 replacement assistant" },
+  { label: "Edith", value: "Edith", desc: "Tactical defense network" },
+  { label: "Computer", value: "Computer", desc: "Classic sci-fi command terminal" },
+  { label: "Stark", value: "Stark", desc: "Industrial laboratory designation" },
+  { label: "Oracle", value: "Oracle", desc: "Predictive neural matrix" },
+];
 
 const PRESET_BACKGROUNDS: Array<{
   id: BackgroundThemeId;
@@ -144,6 +159,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<"background" | "features" | "audio">("background");
   const [customUrlInput, setCustomUrlInput] = useState<string>(settings.background.customUrl || "");
+  const [wakeWordInput, setWakeWordInput] = useState<string>(settings.voice?.wakeWord || "Jarvis");
+  const [isTestingWakeWord, setIsTestingWakeWord] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!isOpen) return null;
@@ -156,6 +173,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         ...partial,
       },
     });
+  };
+
+  const handleUpdateVoice = (partial: Partial<VoiceSettings>) => {
+    const currentVoice: VoiceSettings = settings.voice || {
+      wakeWord: "Jarvis",
+      enableWakeWord: true,
+      speechRecognitionLang: "en-US",
+      continuousWakeWord: true,
+    };
+    onUpdateSettings({
+      ...settings,
+      voice: {
+        ...currentVoice,
+        ...partial,
+      },
+    });
+    jarvisSound.playBlip();
+  };
+
+  const handleApplyWakeWord = (word?: string) => {
+    const target = (word ?? wakeWordInput).trim();
+    if (!target) return;
+    setWakeWordInput(target);
+    handleUpdateVoice({ wakeWord: target });
+    jarvisSound.playActivationChime();
+  };
+
+  const handleTestWakeWord = () => {
+    setIsTestingWakeWord(true);
+    jarvisSound.playActivationChime();
+    setTimeout(() => {
+      setIsTestingWakeWord(false);
+    }, 2500);
   };
 
   const handleUpdateFeature = (key: keyof FeatureFlags, value: boolean) => {
@@ -376,8 +426,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
             }`}
           >
-            <Volume2 className="w-3.5 h-3.5" />
-            <span>AUDIO & HARDWARE</span>
+            <Mic className="w-3.5 h-3.5" />
+            <span>VOICE & AUDIO MATRIX</span>
           </button>
         </div>
 
@@ -1059,13 +1109,239 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: AUDIO & HARDWARE */}
+          {/* TAB 3: AUDIO & VOICE MATRIX */}
           {activeTab === "audio" && (
-            <div className="space-y-5">
-              <div className="p-4 rounded-xl bg-slate-950/80 border border-cyan-500/20 space-y-4">
+            <div className="space-y-6">
+              {/* Custom Wake-Word Recognition Matrix Card */}
+              <div className="p-5 rounded-xl bg-slate-950/90 border border-cyan-500/30 shadow-lg shadow-cyan-950/30 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                      <Mic className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-cyan-300 tracking-wider uppercase">
+                        CUSTOM WAKE-WORD RECOGNITION MATRIX
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        Define custom trigger phrase to activate ambient voice microphone listening
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 border ${
+                        settings.voice?.enableWakeWord !== false
+                          ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/40 animate-pulse"
+                          : "bg-slate-900 text-slate-500 border-slate-800"
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          settings.voice?.enableWakeWord !== false ? "bg-emerald-400" : "bg-slate-600"
+                        }`}
+                      />
+                      {settings.voice?.enableWakeWord !== false ? "LISTENER ACTIVE" : "STANDBY"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Custom Wake-Word Text Input Field */}
+                <div className="space-y-2">
+                  <label htmlFor="custom-wake-word-input" className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Custom Wake-Word Phrase:</span>
+                    </span>
+                    <span className="text-[10px] text-cyan-400/80 font-mono">
+                      Current: <strong className="text-cyan-300 uppercase underline">"{settings.voice?.wakeWord || "Jarvis"}"</strong>
+                    </span>
+                  </label>
+
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        id="custom-wake-word-input"
+                        type="text"
+                        value={wakeWordInput}
+                        onChange={(e) => setWakeWordInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handleApplyWakeWord();
+                          }
+                        }}
+                        placeholder="Enter wake-word (e.g. Jarvis, Friday, Computer, Edith)..."
+                        className="w-full bg-slate-900/90 border border-slate-700 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 rounded-lg px-3.5 py-2 text-xs text-white placeholder-slate-500 font-mono transition-all outline-none"
+                      />
+                      {wakeWordInput && (
+                        <button
+                          type="button"
+                          onClick={() => setWakeWordInput("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
+                          title="Clear input"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleApplyWakeWord()}
+                      className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold tracking-wider uppercase transition-all shadow-md shadow-cyan-950/50 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>APPLY</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Fast Preset Wake-Word Buttons */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-cyan-400" />
+                    <span>Quick Tactical Presets:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {WAKE_WORD_PRESETS.map((preset) => {
+                      const isSelected =
+                        (settings.voice?.wakeWord || "Jarvis").toLowerCase() ===
+                        preset.value.toLowerCase();
+                      return (
+                        <button
+                          key={preset.value}
+                          type="button"
+                          onClick={() => {
+                            handleApplyWakeWord(preset.value);
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5 cursor-pointer border ${
+                            isSelected
+                              ? "bg-cyan-500/20 text-cyan-200 border-cyan-400 shadow-sm shadow-cyan-500/20 font-bold"
+                              : "bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-slate-700"
+                          }`}
+                          title={preset.desc}
+                        >
+                          {isSelected && <CheckCircle2 className="w-3 h-3 text-cyan-400" />}
+                          <span>{preset.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Configuration Toggles & Controls */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  {/* Toggle: Continuous Wake-Word Monitoring */}
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <div>
+                      <div className="text-xs font-semibold text-slate-200">
+                        Continuous Ambient Listening
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Acoustic background keyword detection
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleUpdateVoice({
+                          enableWakeWord: !(settings.voice?.enableWakeWord !== false),
+                        });
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer border ${
+                        settings.voice?.enableWakeWord !== false
+                          ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/60"
+                          : "bg-slate-900 text-slate-500 border-slate-800"
+                      }`}
+                    >
+                      {settings.voice?.enableWakeWord !== false ? (
+                        <Mic className="w-3.5 h-3.5 text-cyan-400" />
+                      ) : (
+                        <MicOff className="w-3.5 h-3.5" />
+                      )}
+                      <span>{settings.voice?.enableWakeWord !== false ? "ON" : "OFF"}</span>
+                    </button>
+                  </div>
+
+                  {/* Toggle: Auto-Resume Wake Listener */}
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/80 border border-slate-800">
+                    <div>
+                      <div className="text-xs font-semibold text-slate-200">
+                        Auto-Resume Wake Loop
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Re-arm wake detector after command
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleUpdateVoice({
+                          continuousWakeWord: !(settings.voice?.continuousWakeWord !== false),
+                        });
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer border ${
+                        settings.voice?.continuousWakeWord !== false
+                          ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/60"
+                          : "bg-slate-900 text-slate-500 border-slate-800"
+                      }`}
+                    >
+                      <span>{settings.voice?.continuousWakeWord !== false ? "ENABLED" : "SINGLE"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Live Wake Word Tester & Locale */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-lg bg-slate-900/60 border border-slate-800/80">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleTestWakeWord}
+                      disabled={isTestingWakeWord}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer border transition-all ${
+                        isTestingWakeWord
+                          ? "bg-amber-500/20 text-amber-300 border-amber-500/60 animate-pulse"
+                          : "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700"
+                      }`}
+                    >
+                      <Play className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>{isTestingWakeWord ? "TRIGGERING WAKE STATE..." : "TEST WAKE-WORD TRIGGER"}</span>
+                    </button>
+                    {isTestingWakeWord && (
+                      <span className="text-[11px] text-amber-400 font-mono flex items-center gap-1">
+                        <Zap className="w-3 h-3 animate-bounce" />
+                        Acoustic Chime Fired!
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-400 text-[11px]">Recognition Locale:</span>
+                    <select
+                      value={settings.voice?.speechRecognitionLang || "en-US"}
+                      onChange={(e) => handleUpdateVoice({ speechRecognitionLang: e.target.value })}
+                      className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-cyan-300 focus:outline-none focus:border-cyan-400"
+                    >
+                      <option value="en-US">English (US)</option>
+                      <option value="en-GB">English (UK)</option>
+                      <option value="en-IN">English (India)</option>
+                      <option value="en-AU">English (Australia)</option>
+                      <option value="en-CA">English (Canada)</option>
+                      <option value="fr-FR">Français (FR)</option>
+                      <option value="de-DE">Deutsch (DE)</option>
+                      <option value="es-ES">Español (ES)</option>
+                      <option value="ja-JP">日本語 (JA)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Synthesizer Sound Effects & Telemetry */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-4">
                 <span className="text-xs font-bold text-cyan-400 tracking-wider uppercase flex items-center gap-1.5">
                   <Volume2 className="w-3.5 h-3.5" />
-                  AUDIO ENGINE & VOICE TELEMETRY
+                  AUDIO ENGINE & SYNTHESIZER TELEMETRY
                 </span>
 
                 <div className="space-y-3">
